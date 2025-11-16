@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directory Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .select-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .select-button:hover {
+            background-color: #2980b9;
+        }
+
+        .select-button:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .refresh-button {
+            background-color: #16a085;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .refresh-button:hover {
+            background-color: #138d75;
+        }
+
+        .refresh-button:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .remove-button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .remove-button:hover {
+            background-color: #c0392b;
+        }
+
+        .remove-button:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .left-panel {
+            width: 35%;
+            background-color: white;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .right-panel {
+            width: 65%;
+            background-color: #fafafa;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-viewer {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .copy-button {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            margin: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .copy-button:hover {
+            background-color: #229954;
+        }
+
+        .copy-button:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .tree-item {
+            margin-left: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .tree-toggle {
+            cursor: pointer;
+            user-select: none;
+            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .tree-toggle:hover {
+            background-color: #ecf0f1;
+            border-radius: 3px;
+        }
+
+        .tree-toggle::before {
+            content: '▶';
+            margin-right: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        .tree-toggle.expanded::before {
+            transform: rotate(90deg);
+        }
+
+        .tree-children {
+            display: none;
+            margin-left: 1rem;
+        }
+
+        .tree-children.expanded {
+            display: block;
+        }
+
+        .file-item {
+            padding: 0.25rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .file-item:hover {
+            background-color: #ecf0f1;
+            border-radius: 3px;
+        }
+
+        .file-checkbox {
+            margin-right: 0.5rem;
+        }
+
+        .file-content {
+            white-space: pre-wrap;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 1rem;
+            line-height: 1.5;
+            font-size: 0.9rem;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            background-color: #fadbd8;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem;
+        }
+
+        .info-message {
+            color: #2c3e50;
+            padding: 1rem;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .path-comment {
+            color: #27ae60;
+            font-weight: bold;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .path-comment:first-child {
+            margin-top: 0;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .left-panel {
+                width: 100%;
+                height: 40%;
+            }
+
+            .right-panel {
+                width: 100%;
+                height: 60%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Directory Explorer</h1>
+        <div class="button-container">
+            <button id="selectDirBtn" class="select-button">Select Directory</button>
+            <button id="refreshBtn" class="refresh-button" disabled>Refresh Directory</button>
+            <button id="removeAllBtn" class="remove-button" disabled>Remove All Selections</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="left-panel">
+            <div id="directoryTree"></div>
+        </div>
+        <div class="right-panel">
+            <div class="content-viewer">
+                <div id="fileContent" class="info-message">
+                    Select files from the directory tree to view their contents here.
+                </div>
+            </div>
+            <button id="copyAllBtn" class="copy-button" disabled>Copy All Content</button>
+        </div>
+    </div>
+
+    <script>
+        class DirectoryExplorer {
+            constructor() {
+                this.directoryHandle = null;
+                this.selectedFiles = new Map();
+                this.fileHandles = new Map();
+                this.watchInterval = null;
+                this.directorySnapshot = new Map();
+                this.DB_NAME = 'DirectoryExplorerDB';
+                this.DB_VERSION = 1;
+                this.db = null;
+                this.init();
+            }
+
+            async init() {
+                this.selectDirBtn = document.getElementById('selectDirBtn');
+                this.refreshBtn = document.getElementById('refreshBtn');
+                this.removeAllBtn = document.getElementById('removeAllBtn');
+                this.directoryTree = document.getElementById('directoryTree');
+                this.fileContent = document.getElementById('fileContent');
+                this.copyAllBtn = document.getElementById('copyAllBtn');
+
+                this.selectDirBtn.addEventListener('click', () => this.selectDirectory());
+                this.refreshBtn.addEventListener('click', () => this.manualRefresh());
+                this.removeAllBtn.addEventListener('click', () => this.removeAllSelections());
+                this.copyAllBtn.addEventListener('click', () => this.copyAllContent());
+
+                await this.checkFileSystemAccessAPI();
+                
+                // Initialize IndexedDB and restore session
+                await this.initDB();
+                await this.restoreSession();
+            }
+
+            async initDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+                    
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => {
+                        this.db = request.result;
+                        resolve();
+                    };
+                    
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        
+                        if (!db.objectStoreNames.contains('directoryHandle')) {
+                            db.createObjectStore('directoryHandle');
+                        }
+                        
+                        if (!db.objectStoreNames.contains('selectedFiles')) {
+                            db.createObjectStore('selectedFiles');
+                        }
+                    };
+                });
+            }
+
+            async saveDirectoryHandle(handle) {
+                if (!this.db) return;
+                
+                try {
+                    const transaction = this.db.transaction(['directoryHandle'], 'readwrite');
+                    const store = transaction.objectStore('directoryHandle');
+                    await store.put(handle, 'current');
+                } catch (error) {
+                    console.error('Error saving directory handle:', error);
+                }
+            }
+
+            async loadDirectoryHandle() {
+                if (!this.db) return null;
+                
+                try {
+                    const transaction = this.db.transaction(['directoryHandle'], 'readonly');
+                    const store = transaction.objectStore('directoryHandle');
+                    const request = store.get('current');
+                    
+                    return new Promise((resolve, reject) => {
+                        request.onsuccess = () => resolve(request.result);
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (error) {
+                    console.error('Error loading directory handle:', error);
+                    return null;
+                }
+            }
+
+            async saveSelectedFiles() {
+                if (!this.db) return;
+                
+                try {
+                    const selectedPaths = Array.from(this.selectedFiles.keys());
+                    const transaction = this.db.transaction(['selectedFiles'], 'readwrite');
+                    const store = transaction.objectStore('selectedFiles');
+                    await store.put(selectedPaths, 'current');
+                } catch (error) {
+                    console.error('Error saving selected files:', error);
+                }
+            }
+
+            async loadSelectedFiles() {
+                if (!this.db) return [];
+                
+                try {
+                    const transaction = this.db.transaction(['selectedFiles'], 'readonly');
+                    const store = transaction.objectStore('selectedFiles');
+                    const request = store.get('current');
+                    
+                    return new Promise((resolve, reject) => {
+                        request.onsuccess = () => resolve(request.result || []);
+                        request.onerror = () => reject(request.error);
+                    });
+                } catch (error) {
+                    console.error('Error loading selected files:', error);
+                    return [];
+                }
+            }
+
+            async restoreSession() {
+                try {
+                    const savedHandle = await this.loadDirectoryHandle();
+                    
+                    if (savedHandle) {
+                        const permission = await savedHandle.queryPermission({ mode: 'read' });
+                        
+                        if (permission === 'granted') {
+                            this.directoryHandle = savedHandle;
+                            await this.buildDirectoryTree();
+                            await this.createDirectorySnapshot();
+                            this.startWatching();
+                            
+                            this.refreshBtn.disabled = false;
+                            
+                            const savedSelectedPaths = await this.loadSelectedFiles();
+                            if (savedSelectedPaths.length > 0) {
+                                setTimeout(async () => {
+                                    await this.restoreSelections(savedSelectedPaths);
+                                    this.updateFileContent();
+                                }, 500);
+                            } else {
+                                this.updateFileContent();
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error restoring session:', error);
+                }
+            }
+
+            async checkFileSystemAccessAPI() {
+                if (!('showDirectoryPicker' in window)) {
+                    let isBrave = false;
+                    if (navigator.brave) {
+                        try {
+                            isBrave = await navigator.brave.isBrave();
+                        } catch (e) {
+                            console.log('Error detecting Brave:', e);
+                        }
+                    }
+                    
+                    const isChromium = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+                    const isEdge = /Edg/.test(navigator.userAgent);
+                    let message = 'File System Access API is not supported in this browser. ';
+                    
+                    if (isBrave) {
+                        message += 'Please make sure you are using Brave version 86 or higher and have enabled the File System Access API in brave://flags';
+                    } else if (!isChromium && !isEdge) {
+                        message += 'Please use a Chromium-based browser like Brave, Google Chrome 86+, or Microsoft Edge 86+.';
+                    } else {
+                        message += 'Please update your browser to the latest version.';
+                    }
+                    this.showError(message);
+                    this.selectDirBtn.disabled = true;
+                }
+            }
+
+            async selectDirectory() {
+                try {
+                    this.directoryHandle = await window.showDirectoryPicker();
+                    this.selectedFiles.clear();
+                    this.fileHandles.clear();
+                    this.directorySnapshot.clear();
+                    
+                    await this.saveDirectoryHandle(this.directoryHandle);
+                    
+                    await this.buildDirectoryTree();
+                    await this.createDirectorySnapshot();
+                    this.startWatching();
+                    this.updateFileContent();
+                    
+                    this.refreshBtn.disabled = false;
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        this.showError(`Error selecting directory: ${error.message}`);
+                    }
+                }
+            }
+
+            async manualRefresh() {
+                if (!this.directoryHandle) return;
+                
+                const originalText = this.refreshBtn.textContent;
+                this.refreshBtn.textContent = 'Refreshing...';
+                this.refreshBtn.disabled = true;
+                
+                try {
+                    await this.refreshDirectory();
+                    
+                    this.refreshBtn.textContent = 'Refreshed!';
+                    this.refreshBtn.style.backgroundColor = '#27ae60';
+                    
+                    setTimeout(() => {
+                        this.refreshBtn.textContent = originalText;
+                        this.refreshBtn.style.backgroundColor = '';
+                        this.refreshBtn.disabled = false;
+                    }, 1500);
+                } catch (error) {
+                    this.showError(`Error refreshing directory: ${error.message}`);
+                    this.refreshBtn.textContent = originalText;
+                    this.refreshBtn.style.backgroundColor = '';
+                    this.refreshBtn.disabled = false;
+                }
+            }
+
+            async removeAllSelections() {
+                this.selectedFiles.clear();
+                this.fileHandles.clear();
+                
+                const checkboxes = document.querySelectorAll('.file-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                
+                await this.saveSelectedFiles();
+                
+                this.updateFileContent();
+                
+                const originalText = this.removeAllBtn.textContent;
+                const originalBg = this.removeAllBtn.style.backgroundColor;
+                this.removeAllBtn.textContent = 'Selections Removed!';
+                this.removeAllBtn.style.backgroundColor = '#27ae60';
+                
+                setTimeout(() => {
+                    this.removeAllBtn.textContent = originalText;
+                    this.removeAllBtn.style.backgroundColor = originalBg;
+                }, 1500);
+            }
+
+            startWatching() {
+                if (this.watchInterval) {
+                    clearInterval(this.watchInterval);
+                }
+
+                this.watchInterval = setInterval(async () => {
+                    await this.checkForChanges();
+                }, 2000);
+            }
+
+            stopWatching() {
+                if (this.watchInterval) {
+                    clearInterval(this.watchInterval);
+                    this.watchInterval = null;
+                }
+            }
+
+            async createDirectorySnapshot() {
+                if (!this.directoryHandle) return;
+                
+                this.directorySnapshot.clear();
+                await this.snapshotDirectory(this.directoryHandle, '');
+            }
+
+            async snapshotDirectory(dirHandle, path) {
+                try {
+                    for await (const [name, handle] of dirHandle.entries()) {
+                        const fullPath = path ? `${path}/${name}` : name;
+                        
+                        if (handle.kind === 'file') {
+                            try {
+                                const file = await handle.getFile();
+                                this.directorySnapshot.set(fullPath, {
+                                    type: 'file',
+                                    size: file.size,
+                                    modified: file.lastModified
+                                });
+                            } catch (error) {
+                            }
+                        } else {
+                            this.directorySnapshot.set(fullPath, { type: 'directory' });
+                            await this.snapshotDirectory(handle, fullPath);
+                        }
+                    }
+                } catch (error) {
+                }
+            }
+
+            async checkForChanges() {
+                if (!this.directoryHandle) return;
+
+                const newSnapshot = new Map();
+                await this.buildSnapshot(this.directoryHandle, '', newSnapshot);
+
+                let hasChanges = false;
+
+                for (const [path, data] of newSnapshot) {
+                    const oldData = this.directorySnapshot.get(path);
+                    if (!oldData) {
+                        hasChanges = true;
+                        break;
+                    }
+                    if (data.type === 'file' && oldData.type === 'file') {
+                        if (data.size !== oldData.size || data.modified !== oldData.modified) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!hasChanges) {
+                    for (const path of this.directorySnapshot.keys()) {
+                        if (!newSnapshot.has(path)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasChanges) {
+                    console.log('Directory changes detected, refreshing...');
+                    await this.refreshDirectory();
+                }
+            }
+
+            async buildSnapshot(dirHandle, path, snapshot) {
+                try {
+                    for await (const [name, handle] of dirHandle.entries()) {
+                        const fullPath = path ? `${path}/${name}` : name;
+                        
+                        if (handle.kind === 'file') {
+                            try {
+                                const file = await handle.getFile();
+                                snapshot.set(fullPath, {
+                                    type: 'file',
+                                    size: file.size,
+                                    modified: file.lastModified
+                                });
+                            } catch (error) {
+                            }
+                        } else {
+                            snapshot.set(fullPath, { type: 'directory' });
+                            await this.buildSnapshot(handle, fullPath, snapshot);
+                        }
+                    }
+                } catch (error) {
+                }
+            }
+
+            async refreshDirectory() {
+                const selectedPaths = Array.from(this.selectedFiles.keys());
+                
+                this.selectedFiles.clear();
+                this.fileHandles.clear();
+                await this.buildDirectoryTree();
+                await this.createDirectorySnapshot();
+
+                await this.restoreSelections(selectedPaths);
+                
+                this.updateFileContent();
+            }
+
+            async restoreSelections(selectedPaths) {
+                for (const path of selectedPaths) {
+                    const fileHandle = await this.getFileHandleByPath(path);
+                    
+                    if (fileHandle) {
+                        const name = path.split('/').pop();
+                        this.selectedFiles.set(path, name);
+                        this.fileHandles.set(path, fileHandle);
+                        
+                        const checkbox = document.getElementById(`file-${path}`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                        }
+                    }
+                }
+                
+                await this.saveSelectedFiles();
+            }
+
+            async getFileHandleByPath(path) {
+                if (!this.directoryHandle) return null;
+                
+                try {
+                    const parts = path.split('/');
+                    let currentHandle = this.directoryHandle;
+                    
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        currentHandle = await currentHandle.getDirectoryHandle(parts[i]);
+                    }
+                    
+                    const fileName = parts[parts.length - 1];
+                    return await currentHandle.getFileHandle(fileName);
+                } catch (error) {
+                    console.error(`Error getting file handle for ${path}:`, error);
+                    return null;
+                }
+            }
+
+            async buildDirectoryTree() {
+                this.directoryTree.innerHTML = '';
+                if (this.directoryHandle) {
+                    const rootElement = await this.createDirectoryElement(this.directoryHandle, this.directoryHandle.name, '');
+                    this.directoryTree.appendChild(rootElement);
+                }
+            }
+
+            async createDirectoryElement(dirHandle, name, path) {
+                const dirElement = document.createElement('div');
+                dirElement.className = 'tree-item';
+
+                const toggle = document.createElement('div');
+                toggle.className = 'tree-toggle';
+                toggle.textContent = name;
+
+                const children = document.createElement('div');
+                children.className = 'tree-children';
+
+                toggle.addEventListener('click', async () => {
+                    if (children.children.length === 0) {
+                        await this.loadDirectoryContents(dirHandle, children, path);
+                    }
+                    toggle.classList.toggle('expanded');
+                    children.classList.toggle('expanded');
+                });
+
+                dirElement.appendChild(toggle);
+                dirElement.appendChild(children);
+
+                return dirElement;
+            }
+
+            async loadDirectoryContents(dirHandle, container, currentPath) {
+                try {
+                    const entries = [];
+                    for await (const [name, handle] of dirHandle.entries()) {
+                        entries.push({ name, handle });
+                    }
+
+                    entries.sort((a, b) => {
+                        if (a.handle.kind !== b.handle.kind) {
+                            return a.handle.kind === 'directory' ? -1 : 1;
+                        }
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    for (const { name, handle } of entries) {
+                        const fullPath = currentPath ? `${currentPath}/${name}` : name;
+
+                        if (handle.kind === 'directory') {
+                            const dirElement = await this.createDirectoryElement(handle, name, fullPath);
+                            container.appendChild(dirElement);
+                        } else {
+                            const fileElement = this.createFileElement(handle, name, fullPath);
+                            container.appendChild(fileElement);
+                        }
+                    }
+                } catch (error) {
+                    this.showError(`Error loading directory contents: ${error.message}`);
+                }
+            }
+
+            createFileElement(fileHandle, name, path) {
+                const fileElement = document.createElement('div');
+                fileElement.className = 'file-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'file-checkbox';
+                checkbox.id = `file-${path}`;
+
+                const label = document.createElement('label');
+                label.htmlFor = `file-${path}`;
+                label.textContent = name;
+                label.style.cursor = 'pointer';
+
+                checkbox.addEventListener('change', async () => {
+                    if (checkbox.checked) {
+                        this.selectedFiles.set(path, name);
+                        this.fileHandles.set(path, fileHandle);
+                    } else {
+                        this.selectedFiles.delete(path);
+                        this.fileHandles.delete(path);
+                    }
+                    
+                    await this.saveSelectedFiles();
+                    this.updateFileContent();
+                    
+                    this.removeAllBtn.disabled = this.selectedFiles.size === 0;
+                });
+
+                if (this.selectedFiles.has(path)) {
+                    checkbox.checked = true;
+                    this.fileHandles.set(path, fileHandle);
+                }
+
+                fileElement.appendChild(checkbox);
+                fileElement.appendChild(label);
+
+                return fileElement;
+            }
+
+            async updateFileContent() {
+                if (this.selectedFiles.size === 0) {
+                    this.fileContent.innerHTML = '<div class="info-message">Select files from the directory tree to view their contents here.</div>';
+                    this.copyAllBtn.disabled = true;
+                    this.removeAllBtn.disabled = true;
+                    return;
+                }
+
+                this.copyAllBtn.disabled = false;
+                this.removeAllBtn.disabled = false;
+                let content = '';
+
+                for (const [path, name] of this.selectedFiles) {
+                    try {
+                        const fileHandle = this.fileHandles.get(path);
+                        const file = await fileHandle.getFile();
+                        
+                        if (this.isTextFile(file)) {
+                            const text = await file.text();
+                            content += `<div class="path-comment">// ${this.getFullPath(path)}</div>`;
+                            content += `<div>${this.escapeHtml(text)}</div>\n\n`;
+                        } else {
+                            content += `<div class="path-comment">// ${this.getFullPath(path)}</div>`;
+                            content += `<div style="color: #e67e22; font-style: italic;">Non-text file: cannot display content.</div>\n\n`;
+                        }
+                    } catch (error) {
+                        content += `<div class="path-comment">// ${this.getFullPath(path)}</div>`;
+                        content += `<div style="color: #e74c3c;">Error reading file: ${error.message}</div>\n\n`;
+                    }
+                }
+
+                this.fileContent.innerHTML = `<div class="file-content">${content}</div>`;
+            }
+
+            isTextFile(file) {
+                const textExtensions = [
+                    '.txt', '.js', '.ts', '.html', '.css', '.json', '.xml', '.md', '.py', '.java', '.cpp', '.c', '.h',
+                    '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.sh', '.bat', '.ps1', '.sql', '.yml', '.yaml',
+                    '.toml', '.ini', '.cfg', '.conf', '.log', '.csv', '.tsv', '.gitignore', '.gitattributes', '.editorconfig',
+                    '.dockerfile', '.makefile', '.readme', '.license', '.changelog'
+                ];
+                
+                const fileName = file.name.toLowerCase();
+                const hasTextExtension = textExtensions.some(ext => fileName.endsWith(ext));
+                
+                const isTextMime = file.type.startsWith('text/') || 
+                                  file.type === 'application/json' || 
+                                  file.type === 'application/xml' ||
+                                  file.type === 'application/javascript';
+                
+                return hasTextExtension || isTextMime || file.size < 1024 * 1024;
+            }
+
+            getFullPath(relativePath) {
+                return this.directoryHandle ? `${this.directoryHandle.name}/${relativePath}` : relativePath;
+            }
+
+            async copyAllContent() {
+                try {
+                    let textContent = '';
+                    
+                    for (const [path, name] of this.selectedFiles) {
+                        try {
+                            const fileHandle = this.fileHandles.get(path);
+                            const file = await fileHandle.getFile();
+                            
+                            textContent += `// ${this.getFullPath(path)}\n`;
+                            
+                            if (this.isTextFile(file)) {
+                                const text = await file.text();
+                                textContent += `${text}\n\n`;
+                            } else {
+                                textContent += `Non-text file: cannot display content.\n\n`;
+                            }
+                        } catch (error) {
+                            textContent += `Error reading file: ${error.message}\n\n`;
+                        }
+                    }
+
+                    await navigator.clipboard.writeText(textContent);
+                    
+                    const originalText = this.copyAllBtn.textContent;
+                    this.copyAllBtn.textContent = 'Copied!';
+                    this.copyAllBtn.style.backgroundColor = '#27ae60';
+                    
+                    setTimeout(() => {
+                        this.copyAllBtn.textContent = originalText;
+                        this.copyAllBtn.style.backgroundColor = '';
+                    }, 2000);
+                    
+                } catch (error) {
+                    this.showError(`Error copying content: ${error.message}`);
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            showError(message) {
+                this.directoryTree.innerHTML = `<div class="error-message">${message}</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new DirectoryExplorer();
+        });
+    </script>
+</body>
+</html>
